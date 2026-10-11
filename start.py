@@ -619,4 +619,12 @@ def main():
 
 
 if __name__ == "__main__":
+    import os
+    import shutil
+    if (sys.platform.startswith("linux") and "scrape" in sys.argv
+            and not os.environ.get("_GR_XVFB")
+            and shutil.which("xvfb-run")):
+        os.environ["_GR_XVFB"] = "1"
+        os.execvp("xvfb-run", ["xvfb-run", "-a", "-s",
+                  "-screen 0 1600x1200x24", sys.executable, *sys.argv])
     main()
