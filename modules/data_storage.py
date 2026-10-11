@@ -44,14 +44,18 @@ class MongoDBStorage:
     def connect(self) -> bool:
         """Connect to MongoDB"""
         try:
-            self.client = pymongo.MongoClient(
-                self.uri,
-                tlsAllowInvalidCertificates=self.tls_allow_invalid_certs,
+            kwargs = dict(
                 connectTimeoutMS=30000,
                 socketTimeoutMS=None,
                 connect=True,
                 maxPoolSize=50,
             )
+            # pymongo: passing any tls* option implies tls=True, even when
+            # False. Only set it when explicitly allowing invalid certs,
+            # otherwise a plain mongodb:// host gets a bogus TLS handshake.
+            if self.tls_allow_invalid_certs:
+                kwargs["tlsAllowInvalidCertificates"] = True
+            self.client = pymongo.MongoClient(self.uri, **kwargs)
             # Test connection
             self.client.admin.command('ping')
             db = self.client[self.db_name]
