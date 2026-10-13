@@ -7,6 +7,64 @@
 
 **FINALLY! A scraper that ACTUALLY WORKS in 2026!** While others break with every Google update, this bad boy keeps on trucking. Say goodbye to the frustration of constantly broken scrapers and hello to a beast that rips through Google's defenses like a hot knife through butter. Multi-business support, SQLite database, MongoDB sync, S3 uploads, and a full CLI toolkit — all in one battle-tested, rock-solid package.
 
+## Fork: skill de opencode + scripts propios (cómo usarlo desde otro opencode)
+
+> **Añadido sobre el scraper de terceros.** Este fork agrega un **skill de opencode** (`skill/`)
+> y **scripts propios** (`scripts/`) que orquestan descubrimiento por cuadrícula, scrape,
+> enriquecimiento y registro de investigaciones. La app de terceros de arriba se usa tal cual;
+> los 3 fixes necesarios (`modules/data_storage.py`, `modules/scraper.py`, `start.py`) **ya están
+> aplicados** en este fork (si partes del repo original, aplícalos con `skill/patches/`).
+
+### Qué incluye
+
+| Ruta | Contenido |
+|---|---|
+| `skill/SKILL.md` | skill opencode `google-reviews-scraper` (operativa F1→F7 + calibración probada) |
+| `skill/README.md` | instalación del skill + referencia rápida |
+| `skill/patches/` | 3 parches de los fixes al repo de terceros (`git apply`) |
+| `skill/docs/INFORME.md` | informe con diagramas |
+| `scripts/` | `investigar.py` (orquestador), `rasterize.py`, `discover.py`, `build_config.py`, `enrich_mongo.py`, `sync_negocio_reviews.py`, `investigaciones.py` |
+| `service.sh` | único arranque/parada: `start`/`stop`/`restart`/`status`/`logs`/`investigacion` |
+
+### Privacidad (importante)
+
+Este repo **no incluye datos privados**: ni negocios, ni reseñas, ni investigaciones, ni
+configuraciones de base de datos. **La base de datos es responsabilidad de cada usuario**:
+cada instalación define su propio MongoDB (por defecto
+`mongodb://admin:admin@127.0.0.1:27017/?authSource=admin`, sobrescribible con `--mongo-uri`/`--db`)
+y su `config.yaml` (autogenerado, en `.gitignore`). Los datos de trabajo (`scripts/raster/`,
+`scripts/dental_scz/`, `*.db`, `logs/`, `downloaded_files/`) **nunca** se versionan.
+
+### Instalar el skill en un opencode remoto
+
+El skill está en `skill/SKILL.md`. opencode exige que **el directorio se llame igual que el
+`name`** del frontmatter (`google-reviews-scraper`).
+
+1. Copiar el skill a una de estas ubicaciones:
+   - **Proyecto (recomendado):** `<workspace>/.opencode/skills/google-reviews-scraper/SKILL.md`
+   - **Global (todas tus sesiones):** `~/.config/opencode/skills/google-reviews-scraper/SKILL.md`
+   - **Vía config:** en `opencode.json`, apuntar al directorio del repo clonado:
+     `{ "skills": { "paths": ["<ruta>/googleReviews/skill"] } }`
+2. Reiniciar opencode (los skills se cargan al arranque).
+3. Verificar que `google-reviews-scraper` aparece en la lista de skills del agente.
+
+### Puesta en marcha (desde la raíz del repo)
+
+```bash
+# 0) Entorno (venv obligatorio; NO usar constraints.txt: conflicto boto3)
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+# Linux: Chrome stable + xvfb (Chrome NUNCA en ventana visible)
+
+# 1) Pipeline completo de una investigación en un solo comando:
+./service.sh investigacion --nombre "MI INVESTIGACIÓN" \
+    --keywords "dental,odontología" \
+    --localidad "Santa Cruz de la Sierra, Bolivia" --radio 15
+```
+
+Fases (F1→F7), geometrías (`--localidad`/`--lat --lng`/`--poligono`), calibración y
+verificación en Mongo: ver `skill/SKILL.md`.
+
 ## Feature Artillery
 
 - **Bulletproof in 2026**: While the competition falls apart, we've cracked Google's latest tricks. Google locked reviews behind a "limited view" in Feb 2026? We bypassed it the same day via search-based navigation — no login needed!

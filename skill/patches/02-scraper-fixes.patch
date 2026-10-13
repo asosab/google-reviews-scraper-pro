@@ -1,0 +1,129 @@
+diff --git a/modules/scraper.py b/modules/scraper.py
+index a333e2c..2829e09 100644
+--- a/modules/scraper.py
++++ b/modules/scraper.py
+@@ -644,6 +644,34 @@ class GoogleReviewsScraper:
+         end_time = time.time() + max_timeout
+         attempts = 0
+ 
++        # Fast path: click the tab whose text/aria-label names reviews. On the
++        # current Maps UI the aria-label selectors and is_reviews_tab scoring
++        # can miss the real "Reseñas" tab and fall through to clicking the
++        # review-count link, which opens only a reduced preview list.
++        keywords = ("rese", "review", "opinion", "opini", "avis", "recension",
++                    "bewertung", "recensione", "valoracion", "valoración")
++        fast_deadline = time.time() + 10
++        while time.time() < fast_deadline:
++            try:
++                tabs = driver.find_elements(By.CSS_SELECTOR, '[role="tab"]')
++                target = None
++                for tab in tabs:
++                    label = f"{tab.text or ''} {tab.get_attribute('aria-label') or ''}".lower()
++                    if any(w in label for w in keywords):
++                        target = tab
++                        break
++                if target is not None:
++                    try:
++                        target.click()
++                    except Exception:
++                        driver.execute_script("arguments[0].click();", target)
++                    time.sleep(2)
++                    log.info(f"Clicked reviews tab via text match: '{target.text}'")
++                    return True
++            except Exception as fast_err:  # noqa: BLE001
++                log.debug(f"Reviews tab fast-path failed: {fast_err}")
++            time.sleep(0.5)
++
+         # Selector order matters — highest-specificity first.
+         # NOTE: `[data-tab-index="1"]` is deliberately NOT first (see #21).
+         # Scoring in is_reviews_tab() would still reject Menu, but putting
+@@ -1434,6 +1462,33 @@ class GoogleReviewsScraper:
+                 return False
+         return False
+ 
++    def _wheel_scroll(self, driver: Chrome, pane: WebElement) -> bool:
++        """
++        Trigger the reviews list's lazy loader with a native mouse-wheel event
++        over the pane center (CDP). Google Maps ignores programmatic
++        scrollTop/scrollBy for infinite loading; a real wheel event works.
++        """
++        try:
++            rect = driver.execute_script(
++                "const r=arguments[0].getBoundingClientRect();"
++                "return {x:Math.round(r.x+r.width/2), y:Math.round(r.y+r.height/2)};",
++                pane,
++            )
++            driver.execute_cdp_cmd(
++                "Input.dispatchMouseEvent",
++                {
++                    "type": "mouseWheel",
++                    "x": rect["x"],
++                    "y": rect["y"],
++                    "deltaX": 0,
++                    "deltaY": 1200,
++                },
++            )
++            return True
++        except Exception as e:  # noqa: BLE001
++            log.warning(f"CDP wheel scroll failed: {e}")
++            return False
++
+     def _scrape_once(self):
+         """Single scrape attempt — may raise _DriverSessionLost for retry."""
+         start_time = time.time()
+@@ -1555,6 +1610,24 @@ class GoogleReviewsScraper:
+                 log.warning("Could not find reviews pane with any selector. Page structure might have changed.")
+                 return False
+ 
++            # The primary selector can also match the overview pane (which
++            # holds only ~5 preview reviews). Prefer the pane that actually
++            # contains the most review cards, otherwise scroll/wheel targets
++            # the wrong element and the scrape stops after a handful.
++            try:
++                best = driver.execute_script(
++                    "const ps=[...document.querySelectorAll('div[role=\"main\"] div.m6QErb')];"
++                    "let b=null,bc=-1;"
++                    "for(const p of ps){const c=p.querySelectorAll('div[data-review-id]').length;"
++                    "if(c>bc){bc=c;b=p;}}"
++                    "return b;"
++                )
++                if best is not None and best != pane:
++                    pane = best
++                    log.info("Refined reviews pane to the one with the most review cards")
++            except Exception as pane_err:  # noqa: BLE001
++                log.debug(f"Pane refinement skipped: {pane_err}")
++
+             progress = Progress(
+                 SpinnerColumn(),
+                 TextColumn("[bold blue]{task.description}"),
+@@ -1631,7 +1704,7 @@ class GoogleReviewsScraper:
+ 
+                         attempts += 1
+                         # Try aggressive scrolling
+-                        driver.execute_script(scroll_script)
++                        self._wheel_scroll(driver, pane)
+                         time.sleep(1)
+                         driver.execute_script("window.scrollBy(0, 1000);")  # Extra scroll
+                         time.sleep(1.5)
+@@ -1757,7 +1830,7 @@ class GoogleReviewsScraper:
+                         # When no new reviews, scroll more aggressively
+                         try:
+                             # Try multiple scroll methods
+-                            driver.execute_script(scroll_script)
++                            self._wheel_scroll(driver, pane)
+                             time.sleep(0.5)
+                             driver.execute_script("window.scrollBy(0, 500);")  # Extra scroll
+                             time.sleep(0.5)
+@@ -1788,9 +1861,10 @@ class GoogleReviewsScraper:
+                     except Exception:
+                         pass
+ 
+-                    # Use JavaScript for smoother scrolling
++                    # Native wheel scroll over the reviews pane triggers lazy load
+                     try:
+-                        driver.execute_script(scroll_script)
++                        if not self._wheel_scroll(driver, pane):
++                            driver.execute_script("window.scrollBy(0, 300);")
+                     except Exception as e:
+                         log.warning(f"Error scrolling: {e}")
+                         # Try a simpler scroll method

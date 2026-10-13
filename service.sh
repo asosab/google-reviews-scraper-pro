@@ -7,10 +7,10 @@
 #   ./service.sh restart                   reinicia con el último comando usado
 #   ./service.sh status                    estado + último comando
 #   ./service.sh logs                      sigue el log (tail -f)
-#   ./service.sh investigacion [--] <args> lanza una investigación completa (ver scripts/googleReviews/investigar.py)
+#   ./service.sh investigacion [--] <args> lanza una investigación completa (ver scripts/investigar.py)
 #
 # El comando se ejecuta con cwd = esta carpeta y el .venv en el PATH
-# (por eso basta `python start.py ...` o `python ../scripts/googleReviews/rasterize.py ...`).
+# (por eso basta `python start.py ...` o `python scripts/rasterize.py ...`).
 # Para scraping con Chrome, antepón `xvfb-run -a -s "-screen 0 1600x1200x24"`.
 
 if grep -qi microsoft /proc/version 2>/dev/null; then
@@ -110,7 +110,7 @@ case "$1" in
         ;;
     investigacion)
         shift
-        start python ../scripts/googleReviews/investigar.py "$@"
+        start python scripts/investigar.py "$@"
         ;;
     stop)
         stop

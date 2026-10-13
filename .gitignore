@@ -116,3 +116,16 @@ google_reviews.ids
 htmlcov/
 .pytest_cache/
 .tox/
+
+# -----------------------------------------------------------
+# Nuestros datos de trabajo (discovery/raster/reseñas locales)
+# Los scripts viven en scripts/, estos directorios son datos.
+# -----------------------------------------------------------
+scripts/raster/
+scripts/dental_scz/
+*.jsonl
+*.geojson
+
+# Estado local de service.sh
+googleReviews.pid
+googleReviews.cmd
